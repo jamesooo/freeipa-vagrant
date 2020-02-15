@@ -35,69 +35,6 @@ Vagrant.configure("2") do |config|
       systemctl enable rngd
       systemctl enable firewalld
       systemctl start firewalld
-      echo CONFIGURING named
-      yum install -y bind bind-utils
-      cat <<EOF | sudo tee /etc/named.conf
-options {
-  listen-on port 53 { 127.0.0.1; 192.168.33.10; };
-  listen-on-v6 port 53 { ::1; };
-};
-acl "trusted" {
-  192.168.33.0/24;
-  localhost;
-};
-include "/etc/named/named.conf.local";
-EOF
-
-      cat <<EOF | sudo tee /etc/named/named.conf.local
-zone "ipa.jamesooo.private" {
-  type master;
-  file "/etc/named/zones/ipa.jamesooo.private";
-};
-zone "33.168.192.in-addr.arpa" {
-  type master;
-  file "/etc/named/zones/ipa.33.168.192.in-addr.arpa";
-};
-EOF
-
-      sudo chmod 755 /etc/named
-      sudo mkdir -p /etc/named/zones
-
-      cat <<EOF | sudo tee /etc/named/zones/ipa.jamesooo.private
-\\\$TTL 30
-@    IN    SOA    ipa.jamesooo.private. ipa.jamesooo.private. (
-             3  ; Serial
-        604800  ; Refresh
-         86400  ; Retry
-       2419200  ; Expire
-        604800 ); Negative Cache TTL
-; name servers - NS records
-    IN    NS    ns1.jamesooo.private.
-; name servers - A records
-ns1.jamesooo.private.    IN    A    192.168.33.10
-; host servers - A records
-ipa.jamesooo.private.    IN    A    192.168.33.10
-EOF
-
-      cat <<EOF | sudo tee /etc/named/zones/ipa.33.168.192.in-addr.arpa
-\\\$TTL 30
-@    IN    SOA    ipa.jamesooo.private.33.168.192.in-addr.arpa ipa.jamesooo.private. (
-      20200212   ; Serial
-      604800     ; Refresh
-      86400      ; Retry
-      2419200    ; Expire
-      30       ) ; Minimum TTL
-; name servers - NS records
-@     IN    NS    ns1.jamesooo.private.
-; PTR Records
-10    IN    PTR    ns1.jamesooo.private.    ; 192.168.33.10
-10    IN    PTR    ipa.jamesooo.private.    ; 192.168.33.10
-EOF
-      systemctl enable named
-      systemctl start named
-      firewall-cmd --permanent --add-port=53/tcp
-      firewall-cmd --permanent --add-port=53/udp
-      echo "nameserver 192.168.33.10" | tee /etc/resolv.conf
       # if ipa-server is already installed we need to uninstall it
       if [ -f /var/log/ipaserver-install.log ]; then
         ipa-server-install --uninstall --unattended
@@ -110,7 +47,7 @@ EOF
       ipa-server-install \
         --unattended \
         --setup-dns \
-        --auto-forwarders \
+        --forwarder 1.1.1.1 \
         --ds-password=dm_password \
         --admin-password=admin_password \
         --ip-address 192.168.33.10 \
